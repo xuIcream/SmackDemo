@@ -1,13 +1,19 @@
 package net.gongmingqm10.smackdemo.xmpp;
 
+import android.content.Intent;
 import android.util.Log;
 
+import net.gongmingqm10.smackdemo.activity.MainActivity;
 import org.jivesoftware.smack.ConnectionConfiguration;
 import org.jivesoftware.smack.ConnectionListener;
+import org.jivesoftware.smack.SASLAuthentication;
 import org.jivesoftware.smack.SmackException;
 import org.jivesoftware.smack.XMPPConnection;
 import org.jivesoftware.smack.XMPPException;
+import org.jivesoftware.smack.sasl.SASLMechanism;
+import org.jivesoftware.smack.sasl.provided.SASLDigestMD5Mechanism;
 import org.jivesoftware.smack.tcp.XMPPTCPConnection;
+import org.jivesoftware.smack.tcp.XMPPTCPConnectionConfiguration;
 
 import java.io.IOException;
 
@@ -16,10 +22,11 @@ public class XMPPManager {
 
     private final String TAG = "XMPPManager";
 
-    private final String serverAddress = "replaceWithYourIP"; // Your server address or IP
-    public static final String serverName = "replaceWithYourServerName"; //xmpp name or your server name
+    private final String serverAddress = "172.16.15.164"; // Your server address or IP
+    public static final String serverName = "xubc"; //xmpp name or your server name
+    public static final String mPassword = "000000";
     private XMPPState state = XMPPState.NOT_CONNECTED;
-    private ConnectionConfiguration config;
+    private XMPPTCPConnectionConfiguration config;
     private static XMPPManager instance;
     public XMPPTCPConnection connection;
 
@@ -27,9 +34,19 @@ public class XMPPManager {
     private String password;
 
     private XMPPManager() {
-        config = new ConnectionConfiguration(serverAddress, 5222, serverName);
-        config.setReconnectionAllowed(true);
-        config.setSecurityMode(ConnectionConfiguration.SecurityMode.disabled);
+        XMPPTCPConnectionConfiguration.Builder builder = XMPPTCPConnectionConfiguration.builder();
+        builder.setServiceName(serverAddress);
+        builder.setResource("SmackAndroidTestClient");
+        builder.setPort(5222);
+        builder.setDebuggerEnabled(false);
+        builder.setSecurityMode(ConnectionConfiguration.SecurityMode.disabled);
+        builder.setConnectTimeout(10000);
+        config = builder.build();
+        SASLMechanism mechanism = new SASLDigestMD5Mechanism();
+        SASLAuthentication.registerSASLMechanism(mechanism);
+        SASLAuthentication.blacklistSASLMechanism("SCRAM-SHA-1");
+        SASLAuthentication.blacklistSASLMechanism("DIGEST-MD5");
+        SASLAuthentication.unBlacklistSASLMechanism("PLAIN");
         connection = new XMPPTCPConnection(config);
         connection.addConnectionListener(new XMPPConnectionListener());
     }
@@ -57,12 +74,15 @@ public class XMPPManager {
             public void run() {
                 try {
                     connection.connect();
-                    connection.login(username, password);
+                    connection.login(username, mPassword);
                 } catch (XMPPException e) {
                     e.printStackTrace();
+                    Log.i(TAG, "XMPPException " + e.toString());
                 } catch (SmackException e) {
                     e.printStackTrace();
+                    Log.i(TAG, "SmackException " + e.toString());
                 } catch (IOException e) {
+                    Log.i(TAG, "IOException " + e.toString());
                     e.printStackTrace();
                 }
             }
@@ -79,9 +99,10 @@ public class XMPPManager {
         }
 
         @Override
-        public void authenticated(XMPPConnection xmppConnection) {
+        public void authenticated(XMPPConnection connection, boolean resumed) {
             Log.i(TAG, "--authenticated--");
             state = XMPPState.AUTHENTICATED;
+            onAuthenticatedListener.onAuthenticated();
         }
 
         @Override
@@ -111,4 +132,14 @@ public class XMPPManager {
         }
     }
 
+
+    private AuthenticatedListener onAuthenticatedListener;
+
+    public void setOnAuthenticatedListener(AuthenticatedListener onAuthenticatedListener) {
+        this.onAuthenticatedListener = onAuthenticatedListener;
+    }
+
+    public interface AuthenticatedListener {
+        void onAuthenticated();
+    }
 }

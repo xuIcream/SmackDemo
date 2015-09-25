@@ -1,9 +1,10 @@
 package net.gongmingqm10.smackdemo.activity;
 
 import android.os.Handler;
-import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
+import android.support.v7.app.AppCompatActivity;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -17,19 +18,18 @@ import net.gongmingqm10.smackdemo.model.ChatMessage;
 import net.gongmingqm10.smackdemo.xmpp.XMPPManager;
 import net.gongmingqm10.smackdemo.xmpp.XMPPState;
 
-import org.jivesoftware.smack.Chat;
-import org.jivesoftware.smack.ChatManager;
-import org.jivesoftware.smack.ChatManagerListener;
-import org.jivesoftware.smack.MessageListener;
 import org.jivesoftware.smack.SmackException;
-import org.jivesoftware.smack.XMPPException;
+import org.jivesoftware.smack.chat.Chat;
+import org.jivesoftware.smack.chat.ChatManager;
+import org.jivesoftware.smack.chat.ChatManagerListener;
+import org.jivesoftware.smack.chat.ChatMessageListener;
 import org.jivesoftware.smack.packet.Message;
 
 import butterknife.ButterKnife;
 import butterknife.InjectView;
 
 
-public class MainActivity extends ActionBarActivity {
+public class MainActivity extends AppCompatActivity {
 
     @InjectView(R.id.messageEdit)
     EditText messageEdit;
@@ -67,9 +67,8 @@ public class MainActivity extends ActionBarActivity {
             if (TextUtils.isEmpty(message) || chatManager == null) return;
             try {
                 chat.sendMessage(message);
-            } catch (XMPPException e) {
-                e.printStackTrace();
             } catch (SmackException.NotConnectedException e) {
+                Log.i("XMPPManager", " sendMessage  NotConnectedException " + message);
                 e.printStackTrace();
             }
             ChatMessage chatMessage = new ChatMessage().setLocal(true).setContent(message);
@@ -82,14 +81,12 @@ public class MainActivity extends ActionBarActivity {
         adapter.addMessage(message);
     }
 
-
-
     private void initState() {
-        getSupportActionBar().setTitle(XMPPManager.getInstance().getState().getMessage());
         chatManager = ChatManager.getInstanceFor(XMPPManager.getInstance().connection);
         chatManager.addChatListener(new ChatManagerListener() {
             @Override
             public void chatCreated(Chat chat, boolean createdLocally) {
+                Log.i("XMPPManager", chat.getThreadID() + "chatCreated " + username + " " +createdLocally, new Exception());
                 if (createdLocally) {
                    // Chat created by myself
                 } else {
@@ -106,9 +103,10 @@ public class MainActivity extends ActionBarActivity {
 
     }
 
-    private MessageListener chatMessageListener = new MessageListener() {
+    private ChatMessageListener chatMessageListener = new ChatMessageListener() {
         @Override
         public void processMessage(Chat chat, Message message) {
+            Log.i("XMPPManager", "processMessage " + message.getFrom());
             // Process the incoming message.
             android.os.Message sendMessage = new android.os.Message();
             sendMessage.what = MESSAGE_FLAG;
@@ -153,10 +151,13 @@ public class MainActivity extends ActionBarActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        try {
-            XMPPManager.getInstance().connection.disconnect();
-        } catch (SmackException.NotConnectedException e) {
-            e.printStackTrace();
-        }
+        chat.close();
+        XMPPManager.getInstance().connection.disconnect();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        getSupportActionBar().setTitle(XMPPManager.getInstance().getState().getMessage());
     }
 }
